@@ -21,6 +21,7 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -41,9 +42,6 @@ private const val DIALOG_TIME = "DialogTime"
 
 private const val TAG = "CrimeFragment"
 private const val DATE_FORMAT = "yyyy년 M월 d일 H시 m분, E요일"
-
-// 연락처 요청.
-private const val REQUEST_CONTACT = 1
 
 class CrimeFragment : Fragment(), FragmentResultListener {
 
@@ -89,6 +87,8 @@ class CrimeFragment : Fragment(), FragmentResultListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // 옵저버에서 데이터 변경을 하게 되므로 써 파일 경로가 자꾸 변하게 된다.
+        // 왜냐하면 crime id 가 파일 경로에 포함되기 때문에 고유한 id 의 파일 경로를 갖게 된다.
         crimeDetailViewModel.crimeLiveData.observe(viewLifecycleOwner, { crime ->
             crime?.let {
                 this.crime = crime
@@ -120,6 +120,7 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         if (crime.number.isNotEmpty()) {
             callButton.text = crime.number
         }
+        updatePhotoView()
     }
 
     private fun getCrimeReport(): String {
@@ -244,7 +245,20 @@ class CrimeFragment : Fragment(), FragmentResultListener {
                         photoUri,
                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 }
+                // Intent 실행.
+                requestCamera.launch(captureImage)
             }
+        }
+    }
+
+    // ImageView 에 Bitmap 을 로드하기 위해 CrimeFragment 에 새로운 함수를 추가하고
+    // photoView 를 변경한다.
+    private fun updatePhotoView() {
+        if(photoFile.exists()) {
+            val bitmap = getScaledBitmap(photoFile.path, requireActivity())
+            photoView.setImageBitmap(bitmap)
+        }else {
+            photoView.setImageBitmap(null)
         }
     }
 
@@ -268,6 +282,14 @@ class CrimeFragment : Fragment(), FragmentResultListener {
             requestPhoneData.launch(pickContactIntent)
         } else {
             Toast.makeText(requireContext(), "권한을 거부 하셨습니다.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val requestCamera = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode == Activity.RESULT_OK) {
+            // 이제 사진을 업데이트 할 수 있으니 퍼미션 취소.
+            requireActivity().revokeUriPermission(photoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            updatePhotoView() // 사진을 찍었을 경우 photoUpdate
         }
     }
 
@@ -308,6 +330,12 @@ class CrimeFragment : Fragment(), FragmentResultListener {
     override fun onStop() {
         super.onStop()
         crimeDetailViewModel.saveCrime(crime)
+    }
+
+    // 부적합한 응답에 대비한 퍼미션 취소.
+    override fun onDetach() {
+        super.onDetach()
+        requireActivity().revokeUriPermission(photoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
     }
 
     companion object {

@@ -5,8 +5,14 @@
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
 
+    <uses-feature android:name="android.hardware.camera"
+        android:required="true" />
+
     <queries>
         <package android:name="com.android.contacts"/>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+        </intent>
     </queries>
 
     <application
