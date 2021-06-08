@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateFormat
@@ -17,18 +18,17 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentResultListener
 import androidx.fragment.app.viewModels
 import com.bignerdranch.criminalintent2.viewmodel.CrimeDetailViewModel
+import java.io.File
 import java.util.*
 
 private const val ARG_CRIME_ID = "crime_id"
@@ -48,6 +48,7 @@ private const val REQUEST_CONTACT = 1
 class CrimeFragment : Fragment(), FragmentResultListener {
 
     private lateinit var crime: Crime
+    private lateinit var photoFile: File
     private lateinit var titleField: EditText
     private lateinit var dateButton: Button
     private lateinit var timeButton: Button
@@ -55,6 +56,10 @@ class CrimeFragment : Fragment(), FragmentResultListener {
     private lateinit var suspectButton: Button
     private lateinit var solvedCheckBox: CheckBox
     private lateinit var callButton: Button
+    private lateinit var photoButton:ImageButton
+    private lateinit var photoView: ImageView
+    private lateinit var photoUri: Uri
+
     private val crimeDetailViewModel by viewModels<CrimeDetailViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +82,8 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         reportButton = view.findViewById(R.id.crime_report) as Button
         suspectButton = view.findViewById(R.id.crime_suspect) as Button
         callButton = view.findViewById(R.id.crime_call) as Button
+        photoButton = view.findViewById(R.id.crime_camera) as ImageButton
+        photoView = view.findViewById(R.id.crime_photo) as ImageView
         return view
     }
 
@@ -85,6 +92,10 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         crimeDetailViewModel.crimeLiveData.observe(viewLifecycleOwner, { crime ->
             crime?.let {
                 this.crime = crime
+                // 해당 파일의 경로를
+                photoFile = crimeDetailViewModel.getPhotoFile(crime)
+                // FileProvider 가 읽을 수 있게 Uri 로 노출.
+                photoUri = FileProvider.getUriForFile(requireActivity(), "com.bignerdranch.criminalintent2.fileprovider", photoFile)
                 updateUI()
             }
         })
@@ -172,20 +183,26 @@ class CrimeFragment : Fragment(), FragmentResultListener {
             val pickContactIntent =
                 Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
 
+            val packageManager = requireActivity().packageManager
+
+            // 데이터 하나 가지고 와서 연락처 앱이 있는지 확인.
+            val resolvedActivity: ResolveInfo? =
+                packageManager.resolveActivity(pickContactIntent, PackageManager.MATCH_DEFAULT_ONLY)
+
+            // 없다면 버튼 비활성화.
+            if (resolvedActivity == null) {
+                isEnabled = false
+            }
+
+            // 있다면 인텐트 실행. 그전에 퍼미션 체크.
             setOnClickListener {
 
                 when {
-                    ContextCompat.checkSelfPermission(
-                        requireContext(),
-                        android.Manifest.permission.READ_CONTACTS
-                    )
+                    ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.READ_CONTACTS)
                             == PackageManager.PERMISSION_GRANTED -> {
-                        startForResult.launch(pickContactIntent)
+                        requestPhoneData.launch(pickContactIntent)
                     }
-                    ContextCompat.checkSelfPermission(
-                        requireContext(),
-                        android.Manifest.permission.READ_CONTACTS
-                    )
+                    ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.READ_CONTACTS)
                             == PackageManager.PERMISSION_DENIED -> {
                         showPermissionContextPopup()
                     }
@@ -193,18 +210,41 @@ class CrimeFragment : Fragment(), FragmentResultListener {
                     else -> requestPermission.launch(android.Manifest.permission.READ_CONTACTS)
                 }
             }
-
-            val packageManager: PackageManager = requireActivity().packageManager
-            val resolvedActivity: ResolveInfo? =
-                packageManager.resolveActivity(pickContactIntent, PackageManager.MATCH_DEFAULT_ONLY)
-            if (resolvedActivity == null) {
-                isEnabled = false
-            }
         }
 
         callButton.setOnClickListener {
             val number = Uri.parse("tel:${crime.number}")
             startActivity(Intent(Intent.ACTION_DIAL, number))
+        }
+
+        photoButton.apply {
+            // 카메라 인텐트를 실행하기 위한 ACTION
+            val captureImage = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            val packageManager = requireActivity().packageManager
+
+            // 한개 데이터만 가지고 와서 있는지 체크.
+            val resolvedActivity: ResolveInfo? =
+                packageManager.resolveActivity(captureImage, PackageManager.MATCH_DEFAULT_ONLY)
+            if(resolvedActivity == null) {
+                isEnabled = false
+            }
+
+            setOnClickListener {
+                captureImage.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+
+                // 가져온 암시적 인텐트 액티비들
+                val cameraActivities:List<ResolveInfo> = packageManager.queryIntentActivities(captureImage, PackageManager.MATCH_DEFAULT_ONLY)
+
+                // 해당 액티비티 들에게 photoUri 에 사진 파일을 쓸 수 있도록
+                // permission 을 추가한다. (매니 패스트에서 grantUriPermissions속성을 추가 했으므로
+                // 퍼미션을 부여할 수 있다.)
+                for(cameraActivity in cameraActivities) {
+                    requireActivity().grantUriPermission(
+                        cameraActivity.activityInfo.packageName,
+                        photoUri,
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                }
+            }
         }
     }
 
@@ -225,13 +265,13 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         if (result) {
             val pickContactIntent =
                 Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
-            startForResult.launch(pickContactIntent)
+            requestPhoneData.launch(pickContactIntent)
         } else {
             Toast.makeText(requireContext(), "권한을 거부 하셨습니다.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private val startForResult =
+    private val requestPhoneData =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
 

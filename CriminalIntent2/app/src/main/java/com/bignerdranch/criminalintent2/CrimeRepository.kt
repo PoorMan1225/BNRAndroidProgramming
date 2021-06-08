@@ -6,6 +6,7 @@ import androidx.room.Room
 import com.bignerdranch.criminalintent2.database.CrimeDatabase
 import com.bignerdranch.criminalintent2.database.migration_1_2
 import com.bignerdranch.criminalintent2.database.migration_2_3
+import java.io.File
 import java.util.*
 import java.util.concurrent.Executors
 
@@ -41,6 +42,12 @@ class CrimeRepository private constructor(context: Context){
             crimeDao.addCrime(crime)
         }
     }
+
+    // 안드로이드의 파일 디렉터리 핸들을 반환.
+    private val fileDir = context.applicationContext.filesDir
+
+    // crime.photoFileName 이 제공하는 파일의 경로를 제공하는 함수.
+    fun getPhotoFile(crime:Crime): File = File(fileDir, crime.photoFileName)
 
     companion object {
         private var INSTANCE: CrimeRepository? = null
