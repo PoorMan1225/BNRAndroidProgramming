@@ -18,6 +18,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.*
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,6 +88,7 @@ class CrimeFragment : Fragment(), FragmentResultListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         // 옵저버에서 데이터 변경을 하게 되므로 써 파일 경로가 자꾸 변하게 된다.
         // 왜냐하면 crime id 가 파일 경로에 포함되기 때문에 고유한 id 의 파일 경로를 갖게 된다.
         crimeDetailViewModel.crimeLiveData.observe(viewLifecycleOwner, { crime ->
@@ -99,9 +101,21 @@ class CrimeFragment : Fragment(), FragmentResultListener {
                 updateUI()
             }
         })
+
         childFragmentManager.apply {
             setFragmentResultListener(DIALOG_DATE, viewLifecycleOwner, this@CrimeFragment)
             setFragmentResultListener(DIALOG_TIME, viewLifecycleOwner, this@CrimeFragment)
+        }
+
+        // viewTreeObserver 에는 OnGlobalLayoutListener 를 비롯해 다양한
+        // 리스너를 등록해서 사용할 수 있다.
+        photoView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+    }
+
+    private val listener = ViewTreeObserver.OnGlobalLayoutListener {
+        if(photoView.height == 0 || photoView.width == 0) {
+            crimeDetailViewModel.destHeight = photoView.height
+            crimeDetailViewModel.destWidth = photoView.width
         }
     }
 
@@ -120,7 +134,7 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         if (crime.number.isNotEmpty()) {
             callButton.text = crime.number
         }
-        updatePhotoView()
+        updatePhotoView(crimeDetailViewModel.destWidth, crimeDetailViewModel.destHeight)
     }
 
     private fun getCrimeReport(): String {
@@ -249,13 +263,21 @@ class CrimeFragment : Fragment(), FragmentResultListener {
                 requestCamera.launch(captureImage)
             }
         }
+
+        photoView.setOnClickListener {
+            if(photoFile.exists()) {
+                DetailPictureFragment.newInstance(photoFile.path).apply {
+                    show(this@CrimeFragment.childFragmentManager, null)
+                }
+            }
+        }
     }
 
     // ImageView 에 Bitmap 을 로드하기 위해 CrimeFragment 에 새로운 함수를 추가하고
     // photoView 를 변경한다.
-    private fun updatePhotoView() {
+    private fun updatePhotoView(destWidth:Int, destHeight:Int) {
         if(photoFile.exists()) {
-            val bitmap = getScaledBitmap(photoFile.path, requireActivity())
+            val bitmap = getScaleBitmap(photoFile.path, destWidth, destHeight)
             photoView.setImageBitmap(bitmap)
         }else {
             photoView.setImageBitmap(null)
@@ -289,7 +311,7 @@ class CrimeFragment : Fragment(), FragmentResultListener {
         if(result.resultCode == Activity.RESULT_OK) {
             // 이제 사진을 업데이트 할 수 있으니 퍼미션 취소.
             requireActivity().revokeUriPermission(photoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            updatePhotoView() // 사진을 찍었을 경우 photoUpdate
+            updatePhotoView(crimeDetailViewModel.destWidth, crimeDetailViewModel.destHeight) // 사진을 찍었을 경우 photoUpdate
         }
     }
 
