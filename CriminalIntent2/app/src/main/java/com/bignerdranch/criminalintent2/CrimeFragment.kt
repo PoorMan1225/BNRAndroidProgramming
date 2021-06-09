@@ -88,6 +88,7 @@ class CrimeFragment : Fragment(), FragmentResultListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Log.d(TAG, "onViewCreated")
 
         // 옵저버에서 데이터 변경을 하게 되므로 써 파일 경로가 자꾸 변하게 된다.
         // 왜냐하면 crime id 가 파일 경로에 포함되기 때문에 고유한 id 의 파일 경로를 갖게 된다.
