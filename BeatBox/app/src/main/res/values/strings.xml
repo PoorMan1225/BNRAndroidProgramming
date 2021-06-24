@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">BeatBox</string>
+    <string name="seek_bar_percent_text">Playback Speed %1$d%2$s</string>
+    <string name="default_progress_text">Playback Speed 0%</string>
 </resources>

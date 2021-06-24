@@ -7,6 +7,7 @@
             type="com.rjhwork.mycompany.beatbox.SoundViewModel" />
     </data>
     <Button
+        android:onClick="@{() -> viewModel.onButtonClicked()}"
         android:text="@{viewModel.title}"
         android:layout_width="match_parent"
         android:layout_height="120dp"
