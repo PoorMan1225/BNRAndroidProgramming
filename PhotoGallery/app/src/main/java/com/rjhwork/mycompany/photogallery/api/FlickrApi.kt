@@ -1,7 +1,9 @@
 package com.rjhwork.mycompany.photogallery.api
 
+import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.http.GET
+import retrofit2.http.Url
 
 interface FlickrApi {
 
@@ -12,4 +14,10 @@ interface FlickrApi {
                 "&extras=url_s"
     )
     fun fetchPhotos(): Call<FlickrResponse>
+
+    // fetchUrlBytes(...) 의 매개변수에 지정된 @Url과 매개변수가 없는 @GET을
+    // 같이 사용하면 Retrofit이 기본 URL 대신 fetchrUrlBytes(...)에 전달된 URL 을 사용한다.
+    @GET
+    fun fetchUrlBytes(@Url url:String):Call<ResponseBody>
+
 }

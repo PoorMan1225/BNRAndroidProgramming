@@ -1,0 +1,2 @@
+rootProject.name = "SampleTextSplit"
+include ':app'
