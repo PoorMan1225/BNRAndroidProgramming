@@ -8,7 +8,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.rjhwork.mycompany.photogallery.api.FlickrApi
 import com.rjhwork.mycompany.photogallery.api.FlickrResponse
+import com.rjhwork.mycompany.photogallery.api.PhotoInterceptor
 import com.rjhwork.mycompany.photogallery.api.PhotoResponse
+import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Callback
@@ -23,19 +25,32 @@ class FlickrFetchr {
     private val flickrApi: FlickrApi
 
     init {
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(PhotoInterceptor())
+            .build()
+
         //https://api.flickr.com/services/rest/?method=flickr.interestingness.getList&api_key=c24e76e070ee117a4977053a56f2e720&format=json&nojsoncallback=1&extras=url_s
         val retrofit: Retrofit = Retrofit.Builder()
             .baseUrl("https://api.flickr.com/") // baseuri 가 변경되었기 때문에 변경
             .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
             .build()
 
         flickrApi = retrofit.create(FlickrApi::class.java)
     }
 
+
     fun fetchPhotos(): LiveData<List<GalleryItem>> {
+        return fetchPhotoMetadata(flickrApi.fetchPhotos())
+    }
+
+    fun searchPhotos(query:String):LiveData<List<GalleryItem>> {
+        return fetchPhotoMetadata(flickrApi.searchPhotos(query))
+    }
+
+    private fun fetchPhotoMetadata(flickrRequest: Call<FlickrResponse>): LiveData<List<GalleryItem>> {
         val responseLiveData: MutableLiveData<List<GalleryItem>> = MutableLiveData()
-        // FlickrResponse 로 요청.
-        val flickrRequest: Call<FlickrResponse> = flickrApi.fetchPhotos()
 
         flickrRequest.enqueue(object : Callback<FlickrResponse> {
             override fun onResponse(call: Call<FlickrResponse>, response: Response<FlickrResponse>) {
@@ -63,7 +78,7 @@ class FlickrFetchr {
     @WorkerThread
     fun fetchPhoto(url:String): Bitmap? {
         val response: Response<ResponseBody> = flickrApi.fetchUrlBytes(url).execute()
-        // 비트맵객체로 변환. use 를 사용해서 resource 해제  
+        // 비트맵객체로 변환. use 를 사용해서 resource 해제
         val bitmap = response.body()?.byteStream()?.use(BitmapFactory::decodeStream)
         Log.i(TAG, "Decoded bitmap=$bitmap from Response=$response")
         return bitmap

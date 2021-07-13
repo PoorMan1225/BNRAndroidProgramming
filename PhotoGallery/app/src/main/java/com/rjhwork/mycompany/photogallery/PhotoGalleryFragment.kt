@@ -47,7 +47,7 @@ class PhotoGalleryFragment : Fragment() {
             val drawable = BitmapDrawable(resources, bitmap)
             photoHolder.bindDrawable(drawable)
         }
-        lifecycle.addObserver(thumbnailDownloader)
+        lifecycle.addObserver(thumbnailDownloader.fragmentLifecycleObserver)
     }
 
     override fun onCreateView(
@@ -56,9 +56,21 @@ class PhotoGalleryFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_photo_gallery, container, false)
 
+        // 뷰의 LifecycleObserver는 Fragment.onCreateView(..) 에서 안전하게 등록할 수 있다.
+        viewLifecycleOwner.lifecycle.addObserver(
+            thumbnailDownloader.viewLifecycleObserver
+        )
+
         photoRecyclerView = view.findViewById(R.id.photo_recycler_view)
         photoRecyclerView.layoutManager = GridLayoutManager(context, 3)
         return view
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        viewLifecycleOwner.lifecycle.removeObserver(
+            thumbnailDownloader.viewLifecycleObserver
+        )
     }
 
     // viewLifecyclerOwner 즉 뷰의 생명주기를 따르기 때문에
@@ -101,7 +113,7 @@ class PhotoGalleryFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         lifecycle.removeObserver(
-            thumbnailDownloader
+            thumbnailDownloader.fragmentLifecycleObserver
         )
     }
 
