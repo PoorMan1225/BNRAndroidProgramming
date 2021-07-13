@@ -7,12 +7,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.*
 import androidx.fragment.app.Fragment
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
@@ -38,6 +37,7 @@ class PhotoGalleryFragment : Fragment() {
         super.onCreate(savedInstanceState)
 
         retainInstance = true
+        setHasOptionsMenu(true) // 메뉴 항목들 툴바에 추가.
 
         // 화면 회전시에도 데이터 메모리에 계속 보존.
         photoGalleryViewModel = ViewModelProvider(this).get(PhotoGalleryViewModel::class.java)
@@ -64,6 +64,46 @@ class PhotoGalleryFragment : Fragment() {
         photoRecyclerView = view.findViewById(R.id.photo_recycler_view)
         photoRecyclerView.layoutManager = GridLayoutManager(context, 3)
         return view
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        super.onCreateOptionsMenu(menu, inflater)
+        inflater.inflate(R.menu.fragment_photo_galley, menu)
+
+        val searchItem:MenuItem = menu.findItem(R.id.menu_item_search)
+        val searchView = searchItem.actionView as SearchView
+
+        searchView.apply {
+            setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+
+                // 쿼리 문자열을 제출 할때, 검색버튼 누를 때.
+                override fun onQueryTextSubmit(query: String?): Boolean {
+                    query ?: return false
+
+                    photoGalleryViewModel.fetchPhotos(query)
+                    return true
+                }
+
+                // 텍스트가 변경 될때마다 호출.
+                override fun onQueryTextChange(newText: String?): Boolean {
+                    return false
+                }
+            })
+
+            setOnClickListener {
+                searchView.setQuery(photoGalleryViewModel.searchTerm, false)
+            }
+        }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when(item.itemId) {
+            R.id.menu_item_clear -> {
+                photoGalleryViewModel.fetchPhotos("")
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onDestroyView() {
