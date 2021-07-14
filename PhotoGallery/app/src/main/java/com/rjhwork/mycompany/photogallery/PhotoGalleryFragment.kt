@@ -18,14 +18,17 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.work.*
 import com.rjhwork.mycompany.photogallery.api.FlickrApi
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
+import java.util.concurrent.TimeUnit
 
 private const val TAG = "PhotoGalleryFragment"
+private const val POLL_WORK = "POLL_WORK"
 
 class PhotoGalleryFragment : Fragment() {
 
@@ -48,6 +51,8 @@ class PhotoGalleryFragment : Fragment() {
             photoHolder.bindDrawable(drawable)
         }
         lifecycle.addObserver(thumbnailDownloader.fragmentLifecycleObserver)
+
+
     }
 
     override fun onCreateView(
@@ -70,7 +75,7 @@ class PhotoGalleryFragment : Fragment() {
         super.onCreateOptionsMenu(menu, inflater)
         inflater.inflate(R.menu.fragment_photo_galley, menu)
 
-        val searchItem:MenuItem = menu.findItem(R.id.menu_item_search)
+        val searchItem: MenuItem = menu.findItem(R.id.menu_item_search)
         val searchView = searchItem.actionView as SearchView
 
         searchView.apply {
@@ -94,13 +99,51 @@ class PhotoGalleryFragment : Fragment() {
                 searchView.setQuery(photoGalleryViewModel.searchTerm, false)
             }
         }
+
+        val toggleItem = menu.findItem(R.id.menu_item_toggle_polling)
+        val isPolling = QueryPreferences.isPolling(requireContext())
+        val toggleItemTitle = if (isPolling) {
+            R.string.stop_polling
+        } else {
+            R.string.start_polling
+        }
+        toggleItem.setTitle(toggleItemTitle)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when(item.itemId) {
+        return when (item.itemId) {
             R.id.menu_item_clear -> {
                 photoGalleryViewModel.fetchPhotos("")
                 true
+            }
+            R.id.menu_item_toggle_polling -> {
+                val isPolling = QueryPreferences.isPolling(requireContext())
+                if (isPolling) {
+                    WorkManager.getInstance(requireContext()).cancelUniqueWork(POLL_WORK)
+                    QueryPreferences.setPolling(requireContext(), false)
+                } else {
+                    // 네트워크 제약.
+                    val constraints = Constraints.Builder()
+                        // 와이파에 에서 즉 비용이 들지 않는 네트워크에서 동작.
+                        .setRequiredNetworkType(NetworkType.UNMETERED)
+                        .build()
+
+                    // 정기적 요청.
+                    val periodicRequest = PeriodicWorkRequest
+                        // 요청할 작업, 시간, 분
+                        .Builder(PollWorker::class.java, 15, TimeUnit.MINUTES)
+                        .setConstraints(constraints)
+                        .build()
+
+                    WorkManager.getInstance(requireContext()).enqueueUniquePeriodicWork(
+                        POLL_WORK, // 작업 이름(고유 값. 작업 취소할때도 쓰임.)
+                        ExistingPeriodicWorkPolicy.KEEP,// 기존 작업을 그대로 두고 새로운 작업 요청을 무시. 교체는 REPLACE
+                        periodicRequest)
+
+                    QueryPreferences.setPolling(requireContext(), true)
+                }
+                activity?.invalidateOptionsMenu()
+                return true
             }
             else -> super.onOptionsItemSelected(item)
         }
@@ -125,16 +168,18 @@ class PhotoGalleryFragment : Fragment() {
         )
     }
 
-    private class PhotoHolder(itemImageView: ImageView):RecyclerView.ViewHolder(itemImageView) {
+    private class PhotoHolder(itemImageView: ImageView) : RecyclerView.ViewHolder(itemImageView) {
 
         // TextView 의 함수 참조. TextView 클래스의 setText() type (CharSequence) -> Unit 을 참조한다.
         // onBindViewHolder 에서 CharSequence 값이 들어왔을 때 bindTitle 이 된다.
-        val bindDrawable : (Drawable) -> Unit = itemImageView::setImageDrawable
+        val bindDrawable: (Drawable) -> Unit = itemImageView::setImageDrawable
     }
 
-    private inner class PhotoAdapter(private val galleryItems: List<GalleryItem>) : RecyclerView.Adapter<PhotoHolder>() {
+    private inner class PhotoAdapter(private val galleryItems: List<GalleryItem>) :
+        RecyclerView.Adapter<PhotoHolder>() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.list_item_gallery, parent, false) as ImageView
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.list_item_gallery, parent, false) as ImageView
             return PhotoHolder(view)
         }
 
@@ -143,7 +188,8 @@ class PhotoGalleryFragment : Fragment() {
 
             // 아이탬을 보여주기전 placeHolder
             thumbnailDownloader.queueThumbnail(holder, galleryItem.url)
-            val placeHolder = ContextCompat.getDrawable(requireContext(), R.drawable.bill_up_close) ?: ColorDrawable()
+            val placeHolder = ContextCompat.getDrawable(requireContext(), R.drawable.bill_up_close)
+                ?: ColorDrawable()
             holder.bindDrawable(placeHolder)
         }
 
