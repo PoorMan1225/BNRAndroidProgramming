@@ -1,5 +1,6 @@
 package com.rjhwork.mycompany.photogallery
 
+import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -8,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.*
+import android.widget.Gallery
 import androidx.fragment.app.Fragment
 import android.widget.ImageView
 import android.widget.TextView
@@ -167,11 +169,25 @@ class PhotoGalleryFragment : VisibleFragment() {
         )
     }
 
-    private class PhotoHolder(itemImageView: ImageView) : RecyclerView.ViewHolder(itemImageView) {
+    private inner class PhotoHolder(itemImageView: ImageView) : RecyclerView.ViewHolder(itemImageView), View.OnClickListener {
 
         // TextView 의 함수 참조. TextView 클래스의 setText() type (CharSequence) -> Unit 을 참조한다.
         // onBindViewHolder 에서 CharSequence 값이 들어왔을 때 bindTitle 이 된다.
         val bindDrawable: (Drawable) -> Unit = itemImageView::setImageDrawable
+        private lateinit var galleryItem: GalleryItem
+
+        init {
+            itemView.setOnClickListener(this)
+        }
+
+        fun bindGalleryItem(item:GalleryItem) {
+            galleryItem = item
+        }
+
+        override fun onClick(v: View?) {
+            val intent = PhotoPageActivity.newInstance(requireContext(), galleryItem.photoPageUri)
+            startActivity(intent)
+        }
     }
 
     private inner class PhotoAdapter(private val galleryItems: List<GalleryItem>) :
@@ -184,7 +200,7 @@ class PhotoGalleryFragment : VisibleFragment() {
 
         override fun onBindViewHolder(holder: PhotoHolder, position: Int) {
             val galleryItem = galleryItems[position]
-
+            holder.bindGalleryItem(galleryItem)
             // 아이탬을 보여주기전 placeHolder
             thumbnailDownloader.queueThumbnail(holder, galleryItem.url)
             val placeHolder = ContextCompat.getDrawable(requireContext(), R.drawable.bill_up_close)

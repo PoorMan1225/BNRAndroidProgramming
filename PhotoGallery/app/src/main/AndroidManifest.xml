@@ -2,10 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.rjhwork.mycompany.photogallery">
 
-    <permission android:name="com.rjhwork.mycompany.photogallery.PRIVATE"
-        android:protectionLevel="signature"/>
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="com.rjhwork.mycompany.photogallery.PRIVATE"/>
+    <permission
+        android:name="com.rjhwork.mycompany.photogallery.PRIVATE"
+        android:protectionLevel="signature" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="com.rjhwork.mycompany.photogallery.PRIVATE" />
 
     <application
         android:name=".PhotoGalleryApplication"
@@ -15,6 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.PhotoGallery">
+        <activity android:name=".PhotoPageActivity" android:configChanges="keyboardHidden|orientation|screenSize"/>
         <activity android:name=".PhotoGalleryActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -22,11 +25,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <receiver android:name=".NotificationReceiver"
-            android:permission="com.rjhwork.mycompany.photogallery.PRIVATE"
-            android:exported="false">
+
+        <receiver
+            android:name=".NotificationReceiver"
+            android:exported="false"
+            android:permission="com.rjhwork.mycompany.photogallery.PRIVATE">
             <intent-filter android:priority="-999">
-                <action android:name="com.rjhwork.mycompany.photogallery.SHOW_NOTIFICATION"/>
+                <action android:name="com.rjhwork.mycompany.photogallery.SHOW_NOTIFICATION" />
             </intent-filter>
         </receiver>
     </application>
